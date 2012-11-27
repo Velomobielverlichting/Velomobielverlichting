@@ -1,0 +1,11 @@
+Timers, clockfrequentie en stroomverbruik
+
+Om stroomverbruik te beperken, wil ik de clockfrequentie van de controller verlagen.
+Dit kan bij de ATmega32U4 door de prescaler van de CPUclock aan te passen.
+Dit kan tijdens het lopen van het programma gebeuren.
+Om de timers op de goede snelheid te laten blijven lopen zal ook de prescaler hiervan aangepast moeten worden.
+De Arduino Leonardo heeft standaard een 16 MHz kristal.
+De standaard CPU clock is ook 16 MHz, (prescaler 1x).
+De timers hebben een prescaler van 64x
+Door nu de timers een prescaler van 8 en de processor ook een prescaler van 8 te geven, wordt de processorfrequentie 2 MHz, en blijven de timers op dezelfde frequentie draaien.
+Stroomverbruik in Idle wrdt dan <1 mA bij 5V voedingsspanning.
