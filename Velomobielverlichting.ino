@@ -1,3 +1,4 @@
+#include "avr/sleep.h"
 #include "Streaming.h"
 
 const int       AantalKnippers  = 10;
@@ -7,30 +8,74 @@ const byte      DimlichtVolSterkte        = 255;
 const byte      GrootlichtVolSterkte      = 255;
 const byte      AchterlichtRemSterkte     = 255;
 const byte      AchterlichtNormaalSterkte = 10;
+const byte      KnipperSterkte            = 255;
 
 const int	BlinkDuration	= 333;		// 333 ms on/off, 1,5 Hz
+const int       DebounceTime    = 50;
+
+// ingangen
+const byte      MinPin    = 2;
+const byte      PlusPin   = 3;
+const byte      LinksPin  = 4;
+const byte      RechtsPin = 5;
+const byte      RemPin    = 6;
+// uitgangen
+const byte      AchterlichtPin = 9;
+const byte      DimlichtPin    = 10;
+const byte      GrootlichtPin  = 11;
+const byte      KnipperLPin    = 12;
+const byte      KnipperRPin    = 13;
+
+
 
 // Constanten voor de toestandsmachine
 enum { LT_OFF, LT_OFF_PLUS, LT_DIM_MIN, LT_DIM, LT_DIM_PLUS, LT_GROOT_MIN, LT_GROOT };
 enum { BL_OFF, BL_ON, BL_PAUSE };
 
-char		Min, Plus, Links, Rechts, Rem;
+volatile int    Clock, OldClock;
 
-volatile int    LinksLat, RechtsLat, Clock;           // moet nog aangepast worden aan Arduino
+class TDebouncedPin {
+  byte    Debounced;
+  byte    PinNo;
+  int     TimeOfLast;
+public:
+  TDebouncedPin(byte Pin);
+  operator byte() { return Debounced; }
+  void debounce(void);
+};
 
-void SetDimlicht(byte Sterkte) {
+TDebouncedPin::TDebouncedPin(byte Pin) {
+  PinNo  = Pin;
+  pinMode(Pin, INPUT_PULLUP);
+  Debounced   = digitalRead(Pin);
 }
 
-void SetGrootlicht(byte Sterkte) {
+void TDebouncedPin::debounce(void) {
+  char  New = digitalRead(PinNo);
+  if (New==Debounced) TimeOfLast=Clock;
+  else if (Clock-TimeOfLast > DebounceTime) Debounced=New;
 }
 
-void SetAchterlicht(byte Sterkte) {
+TDebouncedPin	Min(MinPin), Plus(PlusPin), Links(LinksPin), Rechts(RechtsPin), Rem(RemPin);
+
+inline void SetAchterlicht(byte Sterkte) {
+  analogWrite(AchterlichtPin, Sterkte);
 }
 
-void SetKnipperL(byte Sterkte) {
+inline void SetDimlicht(byte Sterkte) {
+  analogWrite(DimlichtPin, Sterkte);
 }
 
-void SetKnipperR(byte Sterkte) {
+inline void SetGrootlicht(byte Sterkte) {
+  analogWrite(GrootlichtPin, Sterkte);
+}
+
+inline void SetKnipperL(byte Sterkte) {
+  analogWrite(KnipperLPin, Sterkte);
+}
+
+inline void SetKnipperR(byte Sterkte) {
+  analogWrite(KnipperRPin, Sterkte);
 }
 
 
@@ -42,13 +87,13 @@ void HandleKnipper() {
 		case BL_OFF:
 			if (Links) {
 				LKnippers	= AantalKnippers;
-				LinksLat	= 1;
+				SetKnipperL(KnipperSterkte);
 				NextTime	= Clock+BlinkDuration;
 				State		= BL_ON;
 			} 
 			if (Rechts) {
 				RKnippers	= AantalKnippers;
-				RechtsLat	= 1;
+				SetKnipperR(KnipperSterkte);
 				NextTime	= Clock+BlinkDuration;
 				State		= BL_ON;
 			}
@@ -57,8 +102,8 @@ void HandleKnipper() {
 		case BL_ON:
 			if (Clock-NextTime>=0) {
 				NextTime	+=BlinkDuration;
-				LinksLat	= 0;
-				RechtsLat	= 0;
+				SetKnipperL(0);
+				SetKnipperR(0);
 				State		= BL_PAUSE;
 				if (LKnippers)	LKnippers--;
 				if (RKnippers)	RKnippers--;
@@ -85,15 +130,15 @@ void HandleKnipper() {
 					RKnippers	= 1;
 					if (!Links) LKnippers	= 0;
 				}
-				if (LKnippers) LinksLat	= 1;
-				if (RKnippers) RechtsLat	= 1;
+				if (LKnippers) SetKnipperL(KnipperSterkte);
+				if (RKnippers) SetKnipperR(KnipperSterkte);
 				State		= LKnippers || RKnippers ? BL_ON : BL_OFF;
 			}
 			break;
 			
 		default:
-			LinksLat	= 0;
-			RechtsLat	= 0;
+			SetKnipperL(0);
+			SetKnipperR(0);
 			State		= BL_OFF;
 			break;
 	}
@@ -120,36 +165,36 @@ void HandleLicht() {
 		case LT_DIM_MIN:	// Licht was gedimd, 'Min' wordt ingedrukt
 			if (!Min) {
 				State	= LT_OFF;
+				SetDimlicht(StadslichtSterkte);
 			}
 			break;
 			
 		case LT_DIM:
 			if (Min) {
 				State	= LT_DIM_MIN;
-				SetDimlicht(StadslichtSterkte);
 			}
 			if (Plus) {
 				State	= LT_DIM_PLUS;
-				SetGrootlicht(GrootlichtVolSterkte);
 			}
 			break;
 			
 		case LT_DIM_PLUS:
 			if (!Plus) {
 				State	= LT_GROOT;
+				SetGrootlicht(GrootlichtVolSterkte);
 			}
 			break;
 			
 		case LT_GROOT_MIN:
 			if (!Min) {
 				State	= LT_DIM;
+				SetGrootlicht(0);
 			}
 			break;
 			
 		case LT_GROOT:
 			if (Min) {
 				State	= LT_GROOT_MIN;
-				SetGrootlicht(0);
 			}
 			break;
 			
@@ -179,19 +224,22 @@ void SetClockTo2MHz(void) {
 
 
 void setup(void) {
-  Serial.begin(115200);
-  while (!Serial) ;
-  Serial << "TCCR0B: " << _HEX(TCCR0B) << endl << "TCCR1B: " << _HEX(TCCR1B) << endl<< "TCCR3B: " << _HEX(TCCR3B) << endl << "TCCR4B: " << _HEX(TCCR4B) << endl; 
   SetClockTo2MHz();
-  Serial << "TCCR0B: " << _HEX(TCCR0B) << endl << "TCCR1B: " << _HEX(TCCR1B) << endl<< "TCCR3B: " << _HEX(TCCR3B) << endl << "TCCR4B: " << _HEX(TCCR4B) << endl; 
-  
-  pinMode(13, OUTPUT);
 }
 
 
 void loop(void) {
-  analogWrite(13, 10);
-  delay(500);
-  analogWrite(13,128);
-  delay(500);
+  Clock  = (int)millis();       // we hebben de tijd nodig als int, niet als usigned long
+  if (Clock!=OldClock) {        // voer de hoofdroutine 1x per milliseconde uit, en ga daarna weer slapen
+    Clock = OldClock;
+    Min.debounce();
+    Plus.debounce();
+    Links.debounce();
+    Rechts.debounce();
+    Rem.debounce();
+    HandleKnipper();
+    HandleLicht();
+    HandleRem();
+  }
+  sleep_cpu();
 }
