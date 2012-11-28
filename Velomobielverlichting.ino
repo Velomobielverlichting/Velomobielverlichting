@@ -13,18 +13,40 @@ const byte      KnipperSterkte            = 255;
 const int	BlinkDuration	= 333;		// 333 ms on/off, 1,5 Hz
 const int       DebounceTime    = 50;
 
+/***************************************************************************************************
+
+Pinout Leonardo Nano Pro Mini / LadyAda Atmega32u4 Breakout Board:
+3V          5V
+E6          ARef
+B0          F0-A5
+B1          F1-A4
+B2          F4-A3
+B3          F5-A2
+D0-3-P      F6-A1
+D1-2        F7-A0
+D2-0        C7-13-P
+D3-1        C6-5-P
+D4-A        B7-11-P
+D5          B6-10-AP
+D6-12-A     B5-9-AP
+D7-8-AP     B4-8-A
+GND         GND
+
+***************************************************************************************************/
+
 // ingangen
-const byte      MinPin    = 2;
-const byte      PlusPin   = 3;
-const byte      LinksPin  = 4;
-const byte      RechtsPin = 5;
-const byte      RemPin    = 6;
+const byte      MinPin    = 3;
+const byte      PlusPin   = 2;
+const byte      LinksPin  = 0;
+const byte      RechtsPin = 1;
+const byte      RemPin    = 12;
+const byte      BatSensePin = A5;
 // uitgangen
-const byte      AchterlichtPin = 9;
-const byte      DimlichtPin    = 10;
+const byte      AchterlichtPin = 13;
+const byte      DimlichtPin    = 5;
 const byte      GrootlichtPin  = 11;
-const byte      KnipperLPin    = 12;
-const byte      KnipperRPin    = 13;
+const byte      KnipperLPin    = 10;
+const byte      KnipperRPin    = 9;
 
 
 
